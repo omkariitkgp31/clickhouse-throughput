@@ -34,17 +34,23 @@ services:
     ports:
       - "6379:6379"
 
-  timescaledb:
-    image: timescale/timescaledb:latest-pg15
-    container_name: fleet-timescaledb
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: fleet-clickhouse
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      CLICKHOUSE_DB: fleet
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     ports:
-      - "5433:5432"
+      - "8123:8123"
+      - "9000:9000"
     volumes:
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db/init.clickhouse.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   init-kafka:
     image: docker.redpanda.com/redpandadata/redpanda:latest
@@ -57,7 +63,7 @@ services:
   ingestion-api-1:
     build:
       context: .
-      dockerfile: ./cmd/ingestion-api/Dockerfile
+      dockerfile: ./src/services/ingestion-api/Dockerfile
     environment:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
@@ -69,7 +75,7 @@ services:
   ingestion-api-2:
     build:
       context: .
-      dockerfile: ./cmd/ingestion-api/Dockerfile
+      dockerfile: ./src/services/ingestion-api/Dockerfile
     environment:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
@@ -81,7 +87,7 @@ services:
   ingestion-api-3:
     build:
       context: .
-      dockerfile: ./cmd/ingestion-api/Dockerfile
+      dockerfile: ./src/services/ingestion-api/Dockerfile
     environment:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
@@ -93,73 +99,85 @@ services:
   stream-processor-1:
     build:
       context: .
-      dockerfile: ./cmd/stream-processor/Dockerfile
+      dockerfile: ./src/services/stream-processor/Dockerfile
     environment:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
       - KAFKA_GROUP=stream-processor-group
       - REDIS_ADDR=redis:6379
-      - DB_CONN=${DB_CONN}
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_DB=fleet
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
     depends_on:
       init-kafka:
         condition: service_completed_successfully
       redis:
         condition: service_started
-      timescaledb:
-        condition: service_started
+      clickhouse:
+        condition: service_healthy
 
   stream-processor-2:
     build:
       context: .
-      dockerfile: ./cmd/stream-processor/Dockerfile
+      dockerfile: ./src/services/stream-processor/Dockerfile
     environment:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
       - KAFKA_GROUP=stream-processor-group
       - REDIS_ADDR=redis:6379
-      - DB_CONN=${DB_CONN}
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_DB=fleet
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
     depends_on:
       init-kafka:
         condition: service_completed_successfully
       redis:
         condition: service_started
-      timescaledb:
-        condition: service_started
+      clickhouse:
+        condition: service_healthy
 
   stream-processor-3:
     build:
       context: .
-      dockerfile: ./cmd/stream-processor/Dockerfile
+      dockerfile: ./src/services/stream-processor/Dockerfile
     environment:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
       - KAFKA_GROUP=stream-processor-group
       - REDIS_ADDR=redis:6379
-      - DB_CONN=${DB_CONN}
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_DB=fleet
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
     depends_on:
       init-kafka:
         condition: service_completed_successfully
       redis:
         condition: service_started
-      timescaledb:
-        condition: service_started
+      clickhouse:
+        condition: service_healthy
 
   query-api:
     build:
       context: .
-      dockerfile: ./cmd/query-api/Dockerfile
+      dockerfile: ./src/services/query-api/Dockerfile
     container_name: query-api
     ports:
       - "8081:8081"
     environment:
       - REDIS_ADDR=redis:6379
-      - DB_CONN=${DB_CONN}
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_DB=fleet
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=
       - PORT=8081
     depends_on:
       redis:
         condition: service_started
-      timescaledb:
-        condition: service_started
+      clickhouse:
+        condition: service_healthy
 
 
 
@@ -184,10 +202,10 @@ services:
     profiles: ["loadtest"]
     environment:
       - API_HOST=api-gateway
-      - DB_HOST=timescaledb
-      - DB_PORT=5432
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_DB=fleet
     depends_on:
       api-gateway:
         condition: service_started
-      timescaledb:
-        condition: service_started
+      clickhouse:
+        condition: service_healthy

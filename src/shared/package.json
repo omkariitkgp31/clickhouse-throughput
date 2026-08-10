@@ -1,0 +1,14 @@
+{
+  "name": "@fleet-tracker/shared",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@clickhouse/client": "^1.0.0",
+    "ioredis": "^5.3.2",
+    "kafkajs": "^2.2.4"
+  }
+}

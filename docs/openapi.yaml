@@ -1,0 +1,190 @@
+openapi: 3.0.3
+info:
+  title: Fleet Tracker API Specification
+  description: Frozen API contract for Fleet Tracker telemetry ingestion, route querying, and system metrics.
+  version: 1.0.0
+paths:
+  /api/v1/telemetry:
+    post:
+      summary: Ingest Telemetry Data
+      description: Accepts raw GPS telemetry ping from an asset and asynchronously queues it to Kafka.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryInput'
+      responses:
+        '202':
+          description: Telemetry accepted for processing
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: accepted
+        '400':
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error / Kafka failure
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/assets/{id}/location:
+    get:
+      summary: Get Asset Latest Location
+      description: Returns the latest recorded GPS location for a given asset from Redis cache.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique Asset ID
+          schema:
+            type: string
+            example: asset-1
+      responses:
+        '200':
+          description: Latest asset telemetry
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryRecord'
+        '404':
+          description: Asset not found or no location reported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/assets/{id}/route:
+    get:
+      summary: Get Asset Route History
+      description: Returns historical telemetry records for an asset within a time range, ordered by timestamp ascending.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique Asset ID
+          schema:
+            type: string
+            example: asset-1
+        - name: start
+          in: query
+          required: true
+          description: ISO-8601 / RFC3339 start timestamp
+          schema:
+            type: string
+            example: '2026-08-10T00:00:00Z'
+        - name: end
+          in: query
+          required: true
+          description: ISO-8601 / RFC3339 end timestamp
+          schema:
+            type: string
+            example: '2026-08-10T23:59:59Z'
+      responses:
+        '200':
+          description: Array of telemetry points
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TelemetryRecord'
+        '400':
+          description: Missing start or end parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/system/metrics:
+    get:
+      summary: Get System Health & Observability Metrics
+      description: Returns real-time observability metrics aggregated across Database, Cache, Queue, and Gateway.
+      responses:
+        '200':
+          description: System metrics JSON
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+                  database_timescaledb:
+                    type: object
+                  cache_redis:
+                    type: object
+                  queue_kafka:
+                    type: object
+                  gateway_nginx:
+                    type: object
+
+components:
+  schemas:
+    TelemetryInput:
+      type: object
+      required:
+        - asset_id
+        - latitude
+        - longitude
+      properties:
+        asset_id:
+          type: string
+          example: asset-1
+        latitude:
+          type: number
+          format: double
+          example: 40.7128
+        longitude:
+          type: number
+          format: double
+          example: -74.0060
+
+    TelemetryRecord:
+      type: object
+      properties:
+        asset_id:
+          type: string
+          example: asset-1
+        latitude:
+          type: number
+          format: double
+          example: 40.7128
+        longitude:
+          type: number
+          format: double
+          example: -74.0060
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-08-10T14:15:00.000Z'
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: Invalid input parameters
