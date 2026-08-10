@@ -13,15 +13,13 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
-	NumAssets      = 100000
-	NumWorkers     = 200
-	TestDuration   = 60 * time.Second
-	BatchSize      = 1000
+	NumAssets    = 100000
+	NumWorkers   = 200
+	TestDuration = 60 * time.Second
+	BatchSize    = 1000
 )
 
 var hubs = [][]float64{
@@ -40,27 +38,17 @@ type Telemetry struct {
 }
 
 func main() {
-	dbHost := getEnv("DB_HOST", "localhost")
 	apiHost := getEnv("API_HOST", "localhost")
-	
-	dbPort := getEnv("DB_PORT", "5433")
-	dbConn := fmt.Sprintf("postgres://postgres:password@%s:%s/fleet?sslmode=disable", dbHost, dbPort)
+	chURL := getEnv("CLICKHOUSE_URL", "http://localhost:8123")
 	apiURL := fmt.Sprintf("http://%s/api/v1/telemetry", apiHost)
 
 	log.Println("==================================================")
 	log.Println("🚀 FLEET TRACKER LOAD TESTER")
 	log.Println("==================================================")
-	
-	log.Printf("Connecting to TimescaleDB at %s...", dbConn)
-	ctx := context.Background()
-	pool, err := pgxpool.New(ctx, dbConn)
-	if err != nil {
-		log.Fatalf("Failed to connect to DB: %v", err)
-	}
-	defer pool.Close()
 
+	log.Printf("Connecting to ClickHouse at %s...", chURL)
 	log.Printf("Inserting %d dummy assets into database (this may take a moment)...", NumAssets)
-	insertAssets(ctx, pool)
+	insertAssets(chURL)
 	log.Println("✅ Database ready.")
 
 	log.Printf("Starting bombardment of %s with %d concurrent workers for %v...", apiURL, NumWorkers, TestDuration)
@@ -216,18 +204,31 @@ Error Breakdown:
 	}
 }
 
-func insertAssets(ctx context.Context, pool *pgxpool.Pool) {
+func insertAssets(chURL string) {
+	client := &http.Client{Timeout: 30 * time.Second}
+	url := fmt.Sprintf("%s/?query=INSERT%%20INTO%%20fleet.assets%%20FORMAT%%20JSONEachRow", chURL)
+
 	for i := 1; i <= NumAssets; i += BatchSize {
-		tx, err := pool.Begin(ctx)
-		if err != nil {
-			log.Fatalf("Failed to begin transaction: %v", err)
-		}
+		var buf bytes.Buffer
 		for j := i; j < i+BatchSize && j <= NumAssets; j++ {
 			assetID := fmt.Sprintf("asset-%d", j)
 			driverName := fmt.Sprintf("Node %d", j)
-			tx.Exec(ctx, "INSERT INTO assets (id, driver_name) VALUES ($1, $2) ON CONFLICT DO NOTHING", assetID, driverName)
+			row := map[string]string{"id": assetID, "driver_name": driverName}
+			b, _ := json.Marshal(row)
+			buf.Write(b)
+			buf.WriteString("\n")
 		}
-		tx.Commit(ctx)
+
+		req, err := http.NewRequest("POST", url, &buf)
+		if err != nil {
+			log.Fatalf("Failed to create HTTP request for assets insert: %v", err)
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Fatalf("Failed to insert assets into ClickHouse: %v", err)
+		}
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
 	}
 }
 

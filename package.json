@@ -1,0 +1,19 @@
+{
+  "name": "fleet-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "High-Throughput Fleet Tracker Backend (Node.js/Express + ClickHouse)",
+  "workspaces": [
+    "src/shared",
+    "src/services/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.2.0"
+  }
+}
