@@ -13,11 +13,11 @@ CREATE TABLE IF NOT EXISTS assets
 ENGINE = ReplacingMergeTree(created_at)
 ORDER BY id;
 
+
 -- Seed default assets
-INSERT INTO assets (id, driver_name) VALUES 
-('asset-1', 'Alice'),
-('asset-2', 'Bob'),
-('asset-3', 'Charlie');
+INSERT INTO assets (id, driver_name) VALUES ('asset-1', 'Alice');
+INSERT INTO assets (id, driver_name) VALUES ('asset-2', 'Bob');
+INSERT INTO assets (id, driver_name) VALUES ('asset-3', 'Charlie');
 
 -- Raw telemetry history (replaces location_history hypertable)
 CREATE TABLE IF NOT EXISTS location_history

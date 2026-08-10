@@ -19,7 +19,7 @@ export class ClickHouseStorage implements TelemetryStorage {
 
     const rows = telemetries.map((t) => ({
       asset_id: t.asset_id,
-      time: t.timestamp,
+      time: t.timestamp.replace('T', ' ').replace('Z', ''),
       latitude: t.latitude,
       longitude: t.longitude,
     }));
