@@ -4,8 +4,10 @@ import { TelemetryStorage } from '../../domain/ports.js';
 
 export class ClickHouseStorage implements TelemetryStorage {
   private client: ClickHouseClient;
+  private database: string;
 
   constructor(url: string, database = 'fleet', username = 'default', password = '') {
+    this.database = database;
     this.client = createClient({
       url,
       database,
@@ -90,7 +92,8 @@ export class ClickHouseStorage implements TelemetryStorage {
 
       // Database size
       const dbSizeRes = await this.client.query({
-        query: "SELECT formatReadableSize(sum(bytes_on_disk)) AS size FROM system.parts WHERE database = 'fleet'",
+        query: `SELECT formatReadableSize(sum(bytes_on_disk)) AS size FROM system.parts WHERE database = {db: String}`,
+        query_params: { db: this.database },
         format: 'JSONEachRow',
       });
       const dbSizeJson: Array<{ size: string }> = await dbSizeRes.json();
@@ -98,7 +101,8 @@ export class ClickHouseStorage implements TelemetryStorage {
 
       // Compression ratio multiplier
       const compStatsRes = await this.client.query({
-        query: "SELECT sum(data_uncompressed_bytes) AS uncompressed, sum(data_compressed_bytes) AS compressed FROM system.parts WHERE database = 'fleet'",
+        query: `SELECT sum(data_uncompressed_bytes) AS uncompressed, sum(data_compressed_bytes) AS compressed FROM system.parts WHERE database = {db: String}`,
+        query_params: { db: this.database },
         format: 'JSONEachRow',
       });
       const compStatsJson: Array<{ uncompressed: string; compressed: string }> = await compStatsRes.json();
