@@ -68,6 +68,7 @@ services:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
       - PORT=8080
+      - DEBUG_INSTANCE_HEADER=true
     depends_on:
       init-kafka:
         condition: service_completed_successfully
@@ -80,6 +81,7 @@ services:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
       - PORT=8080
+      - DEBUG_INSTANCE_HEADER=true
     depends_on:
       init-kafka:
         condition: service_completed_successfully
@@ -92,6 +94,7 @@ services:
       - KAFKA_BROKERS=redpanda:9092
       - KAFKA_TOPIC=telemetry
       - PORT=8080
+      - DEBUG_INSTANCE_HEADER=true
     depends_on:
       init-kafka:
         condition: service_completed_successfully

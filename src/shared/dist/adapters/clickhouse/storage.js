@@ -4,7 +4,9 @@ exports.ClickHouseStorage = void 0;
 const client_1 = require("@clickhouse/client");
 class ClickHouseStorage {
     client;
+    database;
     constructor(url, database = 'fleet', username = 'default', password = '') {
+        this.database = database;
         this.client = (0, client_1.createClient)({
             url,
             database,
@@ -17,7 +19,7 @@ class ClickHouseStorage {
             return;
         const rows = telemetries.map((t) => ({
             asset_id: t.asset_id,
-            time: t.timestamp,
+            time: t.timestamp.replace('T', ' ').replace('Z', ''),
             latitude: t.latitude,
             longitude: t.longitude,
         }));
@@ -77,14 +79,16 @@ class ClickHouseStorage {
             metrics.active_db_connections = Number(activeConnsJson[0]?.count || 0);
             // Database size
             const dbSizeRes = await this.client.query({
-                query: "SELECT formatReadableSize(sum(bytes_on_disk)) AS size FROM system.parts WHERE database = 'fleet'",
+                query: `SELECT formatReadableSize(sum(bytes_on_disk)) AS size FROM system.parts WHERE database = {db: String}`,
+                query_params: { db: this.database },
                 format: 'JSONEachRow',
             });
             const dbSizeJson = await dbSizeRes.json();
             metrics.database_size = dbSizeJson[0]?.size || '0 B';
             // Compression ratio multiplier
             const compStatsRes = await this.client.query({
-                query: "SELECT sum(data_uncompressed_bytes) AS uncompressed, sum(data_compressed_bytes) AS compressed FROM system.parts WHERE database = 'fleet'",
+                query: `SELECT sum(data_uncompressed_bytes) AS uncompressed, sum(data_compressed_bytes) AS compressed FROM system.parts WHERE database = {db: String}`,
+                query_params: { db: this.database },
                 format: 'JSONEachRow',
             });
             const compStatsJson = await compStatsRes.json();
