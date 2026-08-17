@@ -47,8 +47,7 @@ high-throughput-tracker-backend/
 │   ├── api-contract.md                  → Frozen HTTP API request/response specification
 │   └── openapi.yaml                     → OpenAPI 3.0 YAML specification
 ├── db/                                  → Database DDL initialization scripts
-│   ├── init.clickhouse.sql              → ClickHouse DDL (assets, location_history, hourly_asset_stats, MV)
-│   └── init.sql                         → Legacy TimescaleDB DDL (retained for baseline diffs)
+│   └── init.clickhouse.sql              → ClickHouse DDL (assets, location_history, hourly_asset_stats, MV)
 ├── api-gateway/                         → Nginx reverse proxy configuration & Dockerfile
 │   ├── Dockerfile                       → Nginx container image build
 │   └── nginx.conf                       → Nginx configuration routing /api/v1/telemetry and /api/v1/

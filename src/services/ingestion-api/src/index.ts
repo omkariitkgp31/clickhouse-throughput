@@ -13,10 +13,15 @@ app.use(express.json());
 app.post('/api/v1/telemetry', async (req: Request, res: Response) => {
   const { asset_id, latitude, longitude } = req.body || {};
 
+  // Preserving typeof === 'number' to intentionally allow valid 0.0 latitude/longitude coordinates, avoiding Go's zero-value rejection quirk.
   if (!asset_id || typeof latitude !== 'number' || typeof longitude !== 'number') {
     return res.status(400).json({
       error: "Key: 'req.AssetID' Error:Field validation for 'AssetID' failed on the 'required' tag",
     });
+  }
+
+  if (process.env.DEBUG_INSTANCE_HEADER === 'true') {
+    res.setHeader('X-Instance-Id', process.env.HOSTNAME || 'unknown');
   }
 
   const telemetry: Telemetry = {
